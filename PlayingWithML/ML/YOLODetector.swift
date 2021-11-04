@@ -10,36 +10,58 @@ import CoreML
 import Vision
 import CoreVideo
 import CoreImage
+import Accelerate
 
 private let modelURL = Bundle.main.url(forResource: "YOLOv3", withExtension: nil)!
-private let confidenceThreshold: Double = 0.7
+private let confidenceThreshold: VNConfidence = 0.7
 
 struct YOLODetectionResult {
   let label: String
   let frame: CGRect
 }
 
+struct Prediction {
+  let classIndex: Int
+  let score: CGFloat
+  let rect: CGRect
+}
+
 final class YOLODetector {
-  static func detect(fromBuffer buffer: CVPixelBuffer) -> YOLODetectionResult? {
-    let ciImage = CIImage(cvPixelBuffer: buffer)
+  typealias Completion = ([YOLODetectionResult]) -> Void
+  private let vnModel = try! VNCoreMLModel(for: MLModel(contentsOf: YOLOv3.urlOfModelInThisBundle))
+
+  func detect(fromBuffer buffer: CVPixelBuffer, completion: @escaping Completion) {
     do {
-      let yolo = YOLOv3(model: try MLModel(contentsOf: YOLOv3.urlOfModelInThisBundle))
-      let result = try yolo.prediction(
-        image: buffer,
-        iouThreshold: nil,
-        confidenceThreshold: confidenceThreshold
-      )
-//      print(result.coordinates)
-//      print(result.confidence)
-      return nil//YOLODetectionResult(label: result.featureNames.first!, frame: .zero)
+      let request = VNCoreMLRequest(model: vnModel) { [weak self] request, error in
+        guard
+          let self = self,
+          let results = request.results
+        else { return }
+
+        completion(self.processResults(results))
+      }
+      let handler = VNImageRequestHandler(cvPixelBuffer: buffer, options: [:])
+      try handler.perform([request])
     } catch {
       print(error)
-      return nil
     }
   }
 
-  static func test() {
-    let model = try! VNCoreMLModel(for: MLModel(contentsOf: modelURL))
-    print(model)
+  private func processResults(_ results: [VNObservation]) -> [YOLODetectionResult] {
+    return results
+      .filter { $0.confidence > confidenceThreshold }
+      .compactMap {
+        guard let observation = $0 as? VNRecognizedObjectObservation
+        else { return nil }
+
+        let box = observation.boundingBox
+        guard let label = observation.labels.first,
+              label.confidence > confidenceThreshold
+        else { return nil }
+
+        return YOLODetectionResult(label: label.identifier, frame: box)
+      }
   }
+
+  // https://habr.com/ru/post/460869/
 }

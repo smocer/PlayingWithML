@@ -15,6 +15,7 @@ final class CameraMLInteractor: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 
   private let sessionManager = CameraSessionManager()
   private let onDetection: (YOLODetectionResult) -> Void
+  private let detector = YOLODetector()
   private let frameProcessingQueue = DispatchQueue(label: "PlayingWithML.FrameProcessingQueue")
 
   init(onDetection: @escaping (YOLODetectionResult) -> Void) {
@@ -57,7 +58,7 @@ final class CameraMLInteractor: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         width: 416,
         height: 416
       ) {
-        YOLODetector.detect(fromBuffer: resizedPixelBuffer)
+        detector.detect(fromBuffer: resizedPixelBuffer)
       }
     }
   }
