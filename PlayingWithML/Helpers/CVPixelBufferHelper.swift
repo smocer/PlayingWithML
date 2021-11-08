@@ -6,6 +6,8 @@
 //  Copyright © 2018年 wanwenhao. All rights reserved.
 //
 
+// https://github.com/Mrlawrance/yolov3-ios/blob/db3a0c79b183450a751625af062051ff4bcd76cc/ios/tiny_model/CVPiexlBuffer+Helpers.swift
+
 import Foundation
 import Accelerate
 

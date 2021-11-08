@@ -10,16 +10,20 @@ import AVFoundation
 import CoreImage
 import Accelerate
 
+protocol CameraMLInteractorView: AnyObject {
+  var models: [YOLODetectionResult] { get set }
+}
+
 final class CameraMLInteractor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+
+  weak var view: CameraMLInteractorView?
   var captureSession: AVCaptureSession { sessionManager.captureSession }
 
   private let sessionManager = CameraSessionManager()
-  private let onDetection: (YOLODetectionResult) -> Void
   private let detector = YOLODetector()
   private let frameProcessingQueue = DispatchQueue(label: "PlayingWithML.FrameProcessingQueue")
 
-  init(onDetection: @escaping (YOLODetectionResult) -> Void) {
-    self.onDetection = onDetection
+  override init() {
     super.init()
 
     let dataOutput = AVCaptureVideoDataOutput()
@@ -52,13 +56,16 @@ final class CameraMLInteractor: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     from connection: AVCaptureConnection
   ) {
     if let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
-      let ciImage = CIImage(cvPixelBuffer: buffer)
       if let resizedPixelBuffer = resizePixelBuffer(
         buffer,
-        width: 416,
-        height: 416
+        width: Int(YOLODetector.Const.sampleSize.width),
+        height: Int(YOLODetector.Const.sampleSize.width)
       ) {
-        detector.detect(fromBuffer: resizedPixelBuffer)
+        detector.detect(fromBuffer: resizedPixelBuffer) { [weak self] results in
+          DispatchQueue.main.async {
+            self?.view?.models = results
+          }
+        }
       }
     }
   }
